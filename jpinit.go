@@ -54,23 +54,32 @@ func (jpd *JpData) LoadJsonFile(path string) {
 }
 
 func (jpd *JpData) Process() {
-	client := jpd.initClient()
+	client := jpd.InitClient()
 
 	//retrieve the  AIP document and the active one
 	var aipDocsList AipDocs
+
 	fmt.Println("Retrieve the AIP Documents")
 	aipDocsList = getAipDocuments(&client)
 	fmt.Println("Retrieve the Active Document")
 	activeAipDoc := aipDocsList.getActiveAipDoc()
+	activeAipDoc.nextEffectiveDate = aipDocsList.GetNextDate(*activeAipDoc)
 	activeAipDoc.countryCode = jpd.CountryDir
-	fmt.Println("   Active Document Effective Date:" + activeAipDoc.effectiveDate.Format("02-Jan-2006") +
+	fmt.Println("Active Document Effective Date:" + activeAipDoc.effectiveDate.Format("02-Jan-2006") +
 		" Publication Date: " + activeAipDoc.publicationDate.Format("02-Jan-2006"))
 	fmt.Println("   " + activeAipDoc.fullURLDir)
+
+	fmt.Println("Retrieve the Navaids List")
+	activeAipDoc.GetNavaids(&client)
+
 	fmt.Println("Retrieve the Airports List")
 	activeAipDoc.GetAirports(&client)
+	activeAipDoc.DownloadAllAiportsHtmlPage(&client)
 	fmt.Println("Number of identified airports: ")
+
 	fmt.Println("Download the Airports Data")
 	activeAipDoc.DownloadAllAiportsData(&client)
+	//Send the PDF files to the FTP files
 	activeAipDoc.SentToFtp()
 }
 
@@ -78,15 +87,27 @@ func (jpd *JpData) Process() {
  * initClient inits an http client to connect to the website  by sending the
  * data to the formular.
  */
-func (jpd *JpData) initClient() http.Client {
+func (jpd *JpData) InitClient() http.Client {
+
 	frmData := jpd.LoginData
+	//Create a cookie Jar to manage the login cookies
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var client = http.Client{Jar: jar}
+	/*
+		//The certificate is signed by SECOM, but unable to transform the certificate to PEM.
+		// It seems there is no pb on windows (maye be because the certificate has been accepted)
+		//As a consequence, the verify is skip
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
 
+		var client = http.Client{Jar: jar, Transport: tr}
+	*/
+	var client = http.Client{Jar: jar}
+	//login to the page
 	v := url.Values{"formName": {frmData.FormName},
 		"password": {frmData.Password},
 		"userID":   {frmData.UserID}}
@@ -94,6 +115,7 @@ func (jpd *JpData) initClient() http.Client {
 	//connect to the website
 	resp, err := client.PostForm(JapanAis.LoginPage, v)
 	if err != nil {
+		log.Println("If error due to certificate problem, install ca-certificates")
 		log.Fatal(err)
 	}
 

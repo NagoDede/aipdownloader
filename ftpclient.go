@@ -38,6 +38,7 @@ func (ftpi *FtpInfo) LoadJsonFile(path string) {
 }
 
 func NewFtpClient(ftpi *FtpInfo) (*ftp.ServerConn, error) {
+
 	client, err := ftp.Dial(ftpi.Host)
 	if err != nil {
 		return nil, err
@@ -50,13 +51,13 @@ func NewFtpClient(ftpi *FtpInfo) (*ftp.ServerConn, error) {
 	return client, nil
 }
 
-func SendFile(c *ftp.ServerConn, inPath string, outPath string) {
+func SendFtpFile(c *ftp.ServerConn, inPath string, outPath string) {
 	inFile, err := os.Open(inPath)
 	// if we os.Open returns an error then handle it
 	if err != nil {
 		fmt.Println(err)
 	}
-	
+
 	err = c.Stor(filepath.ToSlash(outPath), inFile)
 	if err != nil {
 		fmt.Println(err)
@@ -67,8 +68,21 @@ func SendFile(c *ftp.ServerConn, inPath string, outPath string) {
 	defer inFile.Close()
 }
 
-func DisconnectFromServer(c *ftp.ServerConn) {
+func DisconnectFromFtpServer(c *ftp.ServerConn) {
 	if err := c.Quit(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func DeleteFtpDirectory(c *ftp.ServerConn, dirPath string) {
+	if err := c.RemoveDirRecur(dirPath); err != nil {
+		log.Printf("** !! Unable to remove %s \n", dirPath)
+	}
+}
+
+func CreateFtpDirectory(c *ftp.ServerConn, dirPath string) {
+
+	if err := c.MakeDir(dirPath); err != nil {
 		log.Fatal(err)
 	}
 }

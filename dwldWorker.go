@@ -91,15 +91,37 @@ func DownloadAndMergeAiportData(apt *Airport, jobs *chan *PdfData, docWg *sync.W
 
 	//merge the pdf data if everything was done
 	//thanks the Wait, the call of DetermineIsDownloaded is not mandatory.
-	//But it provides a complementary means of verification
+	//But it provides a complementary means of verification$
+	//Merge only if there is more than one file.
 	if apt.DetermmineIsDownloaded() {
 		fmt.Println("Airport: " + apt.icao + " all docs downloaded confirmed.")
-		err := MergePdfDataOfAiport(apt)
-		if err != nil {
-			DownloadAndMergeAiportData(apt, jobs, docWg, true)
+		if len(apt.PdfData) > 1 {
+			fmt.Printf("     Airport: %s merging files (%d). \n", apt.icao, len(apt.PdfData))
+			err := MergePdfDataOfAiport(apt)
+			if err != nil {
+				fmt.Println("     Problem on Airport: %s download again. \n", apt.icao)
+				DownloadAndMergeAiportData(apt, jobs, docWg, true)
+			} else {
+				//All the airport downloads and merge have been done. The airport can be remove of the waiting group
+				docWg.Done()
+			}
+		} else if len(apt.PdfData) == 1 {
+			//copy the file in the merge directory
+			outPath := apt.aipDocument.DirMergeFiles()
+			outFullMerge := MergedData{fileName: apt.icao + "_full.pdf", fileDirectory: outPath}
+			opth := filepath.Join(outFullMerge.fileDirectory, outFullMerge.fileName)
+			_, err := Copy(apt.PdfData[0].FilePath(), opth)
+			if err != nil {
+				fmt.Println("     Problem with Airport: %s unable to copy in %s. \n", apt.icao, opth)
+				fmt.Println("       Download file(s) again")
+				DownloadAndMergeAiportData(apt, jobs, docWg, true)
+			} else {
+				apt.MergePdf = append(apt.MergePdf, outFullMerge)
+				docWg.Done()
+			}
+
 		} else {
-			//All the airport downloads and merge have been done. The airport can be remove of the waiting group
-			docWg.Done()
+			log.Printf("No PDF file for %s \n", apt.icao)
 		}
 	} else {
 		//all the files have not been downloaded. Start again the download...
@@ -160,4 +182,28 @@ func DownloadAiportData(apt *Airport, jobs *chan *PdfData, force bool) {
 		log.Fatal(err)
 		panic(err)
 	}
+}
+
+func Copy(src string, dst string) (int64, error) {
+	src_file, err := os.Open(src)
+	if err != nil {
+		return 0, err
+	}
+	defer src_file.Close()
+
+	src_file_stat, err := src_file.Stat()
+	if err != nil {
+		return 0, err
+	}
+
+	if !src_file_stat.Mode().IsRegular() {
+		return 0, fmt.Errorf("%s is not a regular file", src)
+	}
+
+	dst_file, err := os.Create(dst)
+	if err != nil {
+		return 0, err
+	}
+	defer dst_file.Close()
+	return io.Copy(dst_file, src_file)
 }

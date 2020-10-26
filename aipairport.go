@@ -2,7 +2,10 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sync"
 )
@@ -21,16 +24,18 @@ type Airport struct {
 	airportType string
 	downloadData
 	adminData   AdminData
-	navaids     []Navaids
+	navaids     map[string]Navaid
 	PdfData     []PdfData
 	MergePdf    []MergedData
 	com         []ComData
 	airport     AirportInterface
 	aipDocument *AipDocument
+	htmlPage    string
 }
 
 type AirportInterface interface {
 	GetPDFFromHTML(cl *http.Client, aipURLDir string)
+	DownloadPage(cl *http.Client)
 }
 
 type downloadData struct {
@@ -59,18 +64,6 @@ type ComData struct {
 	remarks         string
 }
 
-// Navaids descvribes the navigation means available on the airport/
-type Navaids struct {
-	id              string
-	frequency       string
-	navaidType      string
-	magVar          string
-	operationsHours string
-	position        string
-	elevation       string
-	remarks         string
-}
-
 type PdfData struct {
 	parentAirport   *Airport
 	title           string
@@ -81,10 +74,10 @@ type PdfData struct {
 }
 
 type MergedData struct {
-	parentAirport   *Airport
-	title           string
-	fileDirectory        string
-	fileName	string
+	parentAirport *Airport
+	title         string
+	fileDirectory string
+	fileName      string
 }
 
 func (a *Airport) GetPDFFromHTML(cl *http.Client, aipURLDir string) {
@@ -119,4 +112,67 @@ func (apt *Airport) DetermmineIsDownloaded() bool {
 		apt.downloadCount = apt.downloadCount + 1
 	}
 	return tempB
+}
+
+func (apt *Airport) DownloadPage(cl *http.Client) { //, aipURLDir string) {
+
+	var indexUrl = apt.aipDocument.fullURLDir + apt.link // aipURLDir + apt.link
+	fmt.Println("     Download the airport page: " + indexUrl)
+	resp, err := cl.Get(indexUrl)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer resp.Body.Close()
+
+	// HTTP GET request
+
+	filePth := filepath.Join(apt.DirDownload(), apt.icao+".html")
+
+	if apt.shouldIDownloadHtmlPage(filePth, resp.ContentLength) {
+		//create the directory
+		os.MkdirAll(apt.DirDownload(), os.ModePerm)
+		newFile, err := os.Create(filePth)
+		// Write bytes from HTTP response to file.
+		// response.Body satisfies the reader interface.
+		// newFile satisfies the writer interface.
+		// That allows us to use io.Copy which accepts
+		// any type that implements reader and writer interface
+
+		numBytesWritten, err := io.Copy(newFile, resp.Body)
+		if err != nil {
+			log.Printf("Unable to write the webpage %s in directory %s \n", indexUrl, filePth)
+			log.Fatal(err)
+		}
+		log.Printf("Airport %s - downloaded %d byte file %s.\n", apt.icao, numBytesWritten, filePth)
+	} else {
+		log.Printf("Airport %s - page %s not saved, local copy is good %s.\n", apt.icao, indexUrl, filePth)
+	}
+	apt.htmlPage = filePth
+}
+
+func (apt *Airport) DownloadAirportPageSync(cl *http.Client, docWg *sync.WaitGroup) {
+	go apt.DownloadPage(cl)
+	docWg.Done()
+}
+
+func (apt *Airport) shouldIDownloadHtmlPage(realPath string, bodySize int64) bool {
+	if st, err := os.Stat(realPath); err == nil {
+		//The file exists, check the date of the file
+		if st.ModTime().After(apt.aipDocument.effectiveDate) && st.ModTime().Before(apt.aipDocument.nextEffectiveDate) {
+			if bodySize == st.Size() {
+				return false
+			}
+		}
+		return true
+
+	} else if os.IsNotExist(err) {
+		return true
+	} else {
+		// Schrodinger: file may or may not exist. See err for details.
+		// Therefore, do *NOT* use !os.IsNotExist(err) to test for file existence
+		log.Printf("File %s is not writeable or readable \n", realPath)
+		return true
+	}
+	return true
 }

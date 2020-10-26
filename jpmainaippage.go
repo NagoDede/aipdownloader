@@ -6,13 +6,13 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 )
-
 
 type AipDocs []*AipDocument
 
@@ -66,6 +66,7 @@ func getActiveAipDocument(mainaip io.ReadCloser) AipDocs {
 								cleanStr := tempCurrent[len("efct-"):]
 								currentDate, err = buildDateFromYYYYMMDD(cleanStr)
 								if err != nil {
+									fmt.Printf("2-Unable to build date from %s \n", cleanStr)
 									panic(err)
 								}
 							}
@@ -74,6 +75,7 @@ func getActiveAipDocument(mainaip io.ReadCloser) AipDocs {
 						if tablecell.HasClass("date") && !tablecell.HasClass("td-right-top-0-0 date") {
 							effectiveDate, err = buildDateFromDD_MMM_YYYY(tablecell.Text())
 							if err != nil {
+								fmt.Printf("1-Unable to build date from %s \n", tablecell.Text())
 								panic(err)
 							}
 
@@ -81,12 +83,15 @@ func getActiveAipDocument(mainaip io.ReadCloser) AipDocs {
 							tempURL, exist := tablecell.Find("a").Attr("href")
 							if exist {
 								partialURL = tempURL
+							} else {
+								fmt.Printf("3 - Unable to retrieve URL \n")
 							}
 						}
 
 						if tablecell.HasClass("td-right-top-0-0 date") {
 							publicationDate, err = buildDateFromDD_MMM_YYYY(tablecell.Text())
 							if err != nil {
+								fmt.Printf("4-Unable to build date from %s \n", tablecell.Text())
 								panic(err)
 							}
 						}
@@ -122,10 +127,12 @@ func getActiveAipDocument(mainaip io.ReadCloser) AipDocs {
 					//we retrieve the dates from the Url and compare with the extracted data
 					pubDateURL, err := getPublicationDateFromPartialURL(partialURL)
 					if err != nil {
+						fmt.Printf("6-Unable to get Publication date from %s \n", partialURL)
 						panic(err)
 					}
 					effDateURL, err := getEffectiveDateFromPartialURL(partialURL)
 					if err != nil {
+						fmt.Printf("7-Unable to get Effective date from %s \n", partialURL)
 						panic(err)
 					}
 					if effectiveDate.Equal(effDateURL) && publicationDate.Equal(pubDateURL) {
@@ -153,38 +160,61 @@ func getActiveAipDocument(mainaip io.ReadCloser) AipDocs {
  * Set an AIP document as active in regard of the targetDate.
  * If no or more than one document have been identified, create a panic
  */
-func (docs AipDocs) setActiveAipDoc(targetDate time.Time) {
+func (docs *AipDocs) setActiveAipDoc(targetDate time.Time) {
 	var countActive int
-	//fmt.Println(targetDate)
-	for _, aipdoc := range docs {
+	fmt.Printf("Target Date is: %s \n", targetDate)
+	var activeDocs AipDocs
+
+	for _, aipdoc := range *docs {
 		if aipdoc.effectiveDate.Equal(targetDate) {
-			// &&
-			//	(aipdoc.publicationDate.After(targetDate) || aipdoc.publicationDate.Equal(targetDate)) {
+			//This will identify the document having an effective date in accordance with the target date.
+			//several documents could be identified as active
 			if aipdoc.isPartialURLValid && aipdoc.isValidDate {
 				aipdoc.isActive = true
 				countActive = countActive + 1
+				activeDocs = append(activeDocs, aipdoc)
 			}
 		}
-		//fmt.Printf("Effective Date: %s Publication Date: %s", aipdoc.effectiveDate, aipdoc.publicationDate)
-
-	}
-
-	if countActive > 1 {
-		panic("More than one document is Active")
-	}
-	if countActive == 0 {
-		panic("No document identified as Active")
 	}
 }
 
-func (docs AipDocs) getActiveAipDoc() AipDocument {
-	var activeDoc AipDocument
-	for _, aipdoc := range docs {
+func (docs *AipDocs) getActiveAipDoc() *AipDocument {
+	var activeDocs []*AipDocument
+
+	//count the number of active document
+	//only one document is active
+	var counter int
+	var activeDoc *AipDocument
+	for _, aipdoc := range *docs {
 		if aipdoc.isActive {
-			activeDoc = *aipdoc
-			return activeDoc
+			counter++
+			activeDoc = aipdoc
+			activeDocs = append(activeDocs, activeDoc)
 		}
 	}
+
+	if counter == 1 {
+		return activeDoc
+	}
+
+	if counter == 0 {
+		panic("No document identified as Active")
+	}
+
+	//for the other cases, need to sort by publication date
+	//the active documents to retrieve the most recent document
+	sort.SliceStable(activeDocs, func(i, j int) bool {
+		return activeDocs[i].publicationDate.After(activeDocs[j].publicationDate)
+	})
+
+	activeDoc = activeDocs[0]
+
+	for i, d := range *docs {
+		if i > 0 {
+			d.isActive = false
+		}
+	}
+	fmt.Printf("Selected Active document is effective date: %s - publication date %s \n", activeDoc.effectiveDate, activeDoc.publicationDate)
 	return activeDoc
 }
 
@@ -290,4 +320,20 @@ func getPublicationDateFromPartialURL(pth string) (time.Time, error) {
 		return time.Now(), errors.New("Unable to extract and retrieve a valide publication date in the URL. Read: " + strTable[0] + " expect YYYYMMDD format.")
 	}
 	return date, nil
+}
+
+func (docs AipDocs) GetNextDate(actDoc AipDocument) time.Time {
+
+	sort.SliceStable(docs, func(i, j int) bool {
+		return docs[i].effectiveDate.Before(docs[j].effectiveDate)
+	})
+
+	for _, d := range docs {
+		if d.effectiveDate.After(actDoc.effectiveDate) {
+			fmt.Printf("Next date is %s \n", d.effectiveDate)
+			return d.effectiveDate
+		}
+	}
+	log.Panic("Unable to identify the next date")
+	return time.Now()
 }
