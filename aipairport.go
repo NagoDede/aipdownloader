@@ -10,13 +10,14 @@ import (
 	"sync"
 )
 
-//
-// The Airport Type contains the information for the definition of an airport in the AIP.
-// The ICAO code is the main mean of identification of the airport.
-// The individual charts are recorded in the PdfData tables.
-// In order to manage the downloads, the structure contains information about the status of the downloads
-// A waiting group is associated to the Airport structure is order to manage the downloads or any other tasks
-// associated to the airport.
+/*
+ The Airport Type contains the information for the definition of an airport in the AIP.
+ The ICAO code is the main mean of identification of the airport.
+ The individual charts are recorded in the PdfData tables.
+ In order to manage the downloads, the structure contains information about the status of the downloads.
+ A waiting group is associated to the Airport structure in order to manage the downloads
+ or any other tasks associated to the airport.
+*/
 type Airport struct {
 	Title       string
 	Icao        string
@@ -44,8 +45,10 @@ type downloadData struct {
 	nbDownloaded  int
 }
 
-// AdminData contains the admnistrative information of the airport.
-// Min information are related to the ARP coordinates, elevation, magnetic variations,...
+/*
+AdminData contains the admnistrative information of the airport.
+Basic information are related to the ARP coordinates, elevation, magnetic variations,...
+*/
 type AdminData struct {
 	ArpCoord         string
 	Elevation        string
@@ -55,7 +58,9 @@ type AdminData struct {
 	Traffic_types    string
 }
 
-// ComData describes the communication means available on the airport.
+/*
+ ComData describes the communication means available on the airport.
+*/
 type ComData struct {
 	service         string
 	frequency       string
@@ -80,10 +85,16 @@ type MergedData struct {
 	fileName      string
 }
 
+/*
+	Get PDF from HTML
+*/
 func (a *Airport) GetPDFFromHTML(cl *http.Client, aipURLDir string) {
 	fmt.Println("Aiport not implemented")
 }
 
+/*
+	Get the download directory.
+*/
 func (a *Airport) DirDownload() string {
 	return filepath.Join(a.aipDocument.DirMainDownload(), a.Icao)
 }
@@ -92,31 +103,41 @@ func (pdf *PdfData) FilePath() string {
 	return filepath.Join(pdf.parentAirport.DirDownload(), pdf.fileName)
 }
 
-//setPdfDataListInChannel the content of the Airpot.PdfData in the indicated channel
-//also, add each PdfData file as a task in the Waiting group of the Airport
-func (apt *Airport) setPdfDataListInChannel(jobs *chan *PdfData) {
-	for i := range apt.PdfData {
-		apt.PdfData[i].parentAirport = apt
-		*jobs <- &(apt.PdfData[i])
-		apt.wg.Add(1) //add to the working group
+/*
+Set in channel the content of the Airport.PdfData in the indicated channel.
+Also, add each PdfData file as a task in the Waiting group of the Airport
+*/
+func (a *Airport) setPdfDataListInChannel(jobs *chan *PdfData) {
+	for i := range a.PdfData {
+		a.PdfData[i].parentAirport = a
+		*jobs <- &(a.PdfData[i])
+		a.wg.Add(1) //add to the working group
 	}
 }
 
-func (apt *Airport) DetermmineIsDownloaded() bool {
+/*
+	Determine if all airport's data have been downloaded.
+*/
+func (a *Airport) DetermmineIsDownloaded() bool {
 	var tempB bool
 	tempB = true
-	for _, pdf := range apt.PdfData {
+	for _, pdf := range a.PdfData {
 		tempB = tempB && pdf.downloadStatus
 	}
 	if tempB {
-		apt.downloadCount = apt.downloadCount + 1
+		a.downloadCount = a.downloadCount + 1
 	}
 	return tempB
 }
 
-func (apt *Airport) DownloadPage(cl *http.Client) { //, aipURLDir string) {
+/*
+	Download the AIP webpage of the airport.
+	This webpage will be used to retrieve all the relevant information.
+	The path to the downloaded file will be indicated in the airport.htmlPage field.
+*/
+func (a *Airport) DownloadPage(cl *http.Client) { //, aipURLDir string) {
 
-	var indexUrl = apt.aipDocument.FullURLDir + apt.link // aipURLDir + apt.link
+	var indexUrl = a.aipDocument.FullURLDir + a.link // aipURLDir + apt.link
 	fmt.Println("     Download the airport page: " + indexUrl)
 	resp, err := cl.Get(indexUrl)
 	if err != nil {
@@ -127,11 +148,11 @@ func (apt *Airport) DownloadPage(cl *http.Client) { //, aipURLDir string) {
 
 	// HTTP GET request
 
-	filePth := filepath.Join(apt.DirDownload(), apt.Icao+".html")
+	filePth := filepath.Join(a.DirDownload(), a.Icao+".html")
 
-	if apt.shouldIDownloadHtmlPage(filePth, resp.ContentLength) {
+	if a.shouldIDownloadHtmlPage(filePth, resp.ContentLength) {
 		//create the directory
-		os.MkdirAll(apt.DirDownload(), os.ModePerm)
+		os.MkdirAll(a.DirDownload(), os.ModePerm)
 		newFile, err := os.Create(filePth)
 		// Write bytes from HTTP response to file.
 		// response.Body satisfies the reader interface.
@@ -144,18 +165,26 @@ func (apt *Airport) DownloadPage(cl *http.Client) { //, aipURLDir string) {
 			log.Printf("Unable to write the webpage %s in directory %s \n", indexUrl, filePth)
 			log.Fatal(err)
 		}
-		log.Printf("Airport %s - downloaded %d byte file %s.\n", apt.Icao, numBytesWritten, filePth)
+		log.Printf("Airport %s - downloaded %d byte file %s.\n", a.Icao, numBytesWritten, filePth)
 	} else {
-		log.Printf("Airport %s - page %s not saved, local copy is good %s.\n", apt.Icao, indexUrl, filePth)
+		log.Printf("Airport %s - page %s not saved, local copy is good %s.\n", a.Icao, indexUrl, filePth)
 	}
-	apt.htmlPage = filePth
+	a.htmlPage = filePth
 }
 
-func (apt *Airport) DownloadAirportPageSync(cl *http.Client, docWg *sync.WaitGroup) {
-	go apt.DownloadPage(cl)
+/*
+	Download the airport page in a synchronous way.
+*/
+func (a *Airport) DownloadAirportPageSync(cl *http.Client, docWg *sync.WaitGroup) {
+	go a.DownloadPage(cl)
 	docWg.Done()
 }
 
+/*
+	Determine if the airport web page shall be downloaded.
+	Return true if the page shall be downloaded.
+	By default, we download the page.
+*/
 func (apt *Airport) shouldIDownloadHtmlPage(realPath string, bodySize int64) bool {
 	if st, err := os.Stat(realPath); err == nil {
 		//The file exists, check the date of the file
