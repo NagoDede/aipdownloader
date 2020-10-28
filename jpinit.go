@@ -9,6 +9,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"time"
 
 	"golang.org/x/net/publicsuffix"
 )
@@ -63,11 +64,14 @@ func (jpd *JpData) Process() {
 	aipDocsList = getAipDocuments(&client)
 	fmt.Println("Retrieve the Active Document")
 	activeAipDoc := aipDocsList.getActiveAipDoc()
-	activeAipDoc.nextEffectiveDate = aipDocsList.GetNextDate(*activeAipDoc)
-	activeAipDoc.countryCode = jpd.CountryDir
-	fmt.Println("Active Document Effective Date:" + activeAipDoc.effectiveDate.Format("02-Jan-2006") +
-		" Publication Date: " + activeAipDoc.publicationDate.Format("02-Jan-2006"))
-	fmt.Println("   " + activeAipDoc.fullURLDir)
+	activeAipDoc.NextEffectiveDate = aipDocsList.GetNextDate(*activeAipDoc)
+	activeAipDoc.CountryCode = jpd.CountryDir
+	activeAipDoc.ProcessDate = time.Now()
+	fmt.Println("Active Document Effective Date:" + activeAipDoc.EffectiveDate.Format("02-Jan-2006") +
+		" Publication Date: " + activeAipDoc.PublicationDate.Format("02-Jan-2006"))
+	fmt.Println("   " + activeAipDoc.FullURLDir)
+
+
 
 	fmt.Println("Retrieve the Navaids List")
 	activeAipDoc.GetNavaids(&client)
@@ -79,6 +83,14 @@ func (jpd *JpData) Process() {
 
 	fmt.Println("Download the Airports Data")
 	activeAipDoc.DownloadAllAiportsData(&client)
+	
+	//write the report JSON file
+	jsonData, err := json.MarshalIndent(activeAipDoc, "", " ")
+	if err != nil {
+        log.Println(err)
+    }
+	_ = ioutil.WriteFile("test.json", jsonData, 0644)
+	
 	//Send the PDF files to the FTP files
 	activeAipDoc.SentToFtp()
 }

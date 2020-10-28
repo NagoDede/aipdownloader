@@ -18,19 +18,19 @@ import (
 // A waiting group is associated to the Airport structure is order to manage the downloads or any other tasks
 // associated to the airport.
 type Airport struct {
-	title       string
-	icao        string
-	link        string
-	airportType string
+	Title       string
+	Icao        string
+	link        string `json:"-"`
+	airportType string `json:"-"`
 	downloadData
-	adminData   AdminData
+	AdminData   AdminData
 	navaids     map[string]Navaid
-	PdfData     []PdfData
-	MergePdf    []MergedData
+	PdfData     []PdfData    `json:"-"`
+	MergePdf    []MergedData `json:"-"`
 	com         []ComData
-	airport     AirportInterface
-	aipDocument *AipDocument
-	htmlPage    string
+	airport     AirportInterface `json:"-"`
+	aipDocument *AipDocument     `json:"-"`
+	htmlPage    string           `json:"-"`
 }
 
 type AirportInterface interface {
@@ -47,12 +47,12 @@ type downloadData struct {
 // AdminData contains the admnistrative information of the airport.
 // Min information are related to the ARP coordinates, elevation, magnetic variations,...
 type AdminData struct {
-	arpCoord         string
-	elevation        string
-	mag_var          string
-	mag_annualchange string
-	geoid_undulation string
-	traffic_types    string
+	ArpCoord         string
+	Elevation        string
+	Mag_var          string
+	Mag_annualchange string
+	Geoid_undulation string
+	Traffic_types    string
 }
 
 // ComData describes the communication means available on the airport.
@@ -85,7 +85,7 @@ func (a *Airport) GetPDFFromHTML(cl *http.Client, aipURLDir string) {
 }
 
 func (a *Airport) DirDownload() string {
-	return filepath.Join(a.aipDocument.DirMainDownload(), a.icao)
+	return filepath.Join(a.aipDocument.DirMainDownload(), a.Icao)
 }
 
 func (pdf *PdfData) FilePath() string {
@@ -116,7 +116,7 @@ func (apt *Airport) DetermmineIsDownloaded() bool {
 
 func (apt *Airport) DownloadPage(cl *http.Client) { //, aipURLDir string) {
 
-	var indexUrl = apt.aipDocument.fullURLDir + apt.link // aipURLDir + apt.link
+	var indexUrl = apt.aipDocument.FullURLDir + apt.link // aipURLDir + apt.link
 	fmt.Println("     Download the airport page: " + indexUrl)
 	resp, err := cl.Get(indexUrl)
 	if err != nil {
@@ -127,7 +127,7 @@ func (apt *Airport) DownloadPage(cl *http.Client) { //, aipURLDir string) {
 
 	// HTTP GET request
 
-	filePth := filepath.Join(apt.DirDownload(), apt.icao+".html")
+	filePth := filepath.Join(apt.DirDownload(), apt.Icao+".html")
 
 	if apt.shouldIDownloadHtmlPage(filePth, resp.ContentLength) {
 		//create the directory
@@ -144,9 +144,9 @@ func (apt *Airport) DownloadPage(cl *http.Client) { //, aipURLDir string) {
 			log.Printf("Unable to write the webpage %s in directory %s \n", indexUrl, filePth)
 			log.Fatal(err)
 		}
-		log.Printf("Airport %s - downloaded %d byte file %s.\n", apt.icao, numBytesWritten, filePth)
+		log.Printf("Airport %s - downloaded %d byte file %s.\n", apt.Icao, numBytesWritten, filePth)
 	} else {
-		log.Printf("Airport %s - page %s not saved, local copy is good %s.\n", apt.icao, indexUrl, filePth)
+		log.Printf("Airport %s - page %s not saved, local copy is good %s.\n", apt.Icao, indexUrl, filePth)
 	}
 	apt.htmlPage = filePth
 }
@@ -159,7 +159,7 @@ func (apt *Airport) DownloadAirportPageSync(cl *http.Client, docWg *sync.WaitGro
 func (apt *Airport) shouldIDownloadHtmlPage(realPath string, bodySize int64) bool {
 	if st, err := os.Stat(realPath); err == nil {
 		//The file exists, check the date of the file
-		if st.ModTime().After(apt.aipDocument.effectiveDate) && st.ModTime().Before(apt.aipDocument.nextEffectiveDate) {
+		if st.ModTime().After(apt.aipDocument.EffectiveDate) && st.ModTime().Before(apt.aipDocument.NextEffectiveDate) {
 			if bodySize == st.Size() {
 				return false
 			}

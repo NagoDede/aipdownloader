@@ -11,7 +11,7 @@ import (
 )
 
 func (aipdcs *AipDocument) GetNavaids(cl *http.Client) []Navaid {
-	var indexUrl = aipdcs.fullURLDir + JapanAis.AipIndexPageName
+	var indexUrl = aipdcs.FullURLDir + JapanAis.AipIndexPageName
 	fmt.Println("   Retrieve RadioNavigation  in " + indexUrl)
 	resp, err := cl.Get(indexUrl)
 	if err != nil {
@@ -42,8 +42,8 @@ func (aipdcs *AipDocument) GetNavaids(cl *http.Client) []Navaid {
 		})
 	})
 
-	fmt.Println("Retrieve data from " + aipdcs.fullURLDir + navaidpage)
-	navaidresp, err := cl.Get(aipdcs.fullURLDir + navaidpage)
+	fmt.Println("Retrieve data from " + aipdcs.FullURLDir + navaidpage)
+	navaidresp, err := cl.Get(aipdcs.FullURLDir + navaidpage)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func loadNavaidsFromHtmlDoc(navaidsdoc *goquery.Document) (map[string]Navaid, in
 }
 
 func (aipdcs *AipDocument) GetAirports(cl *http.Client) []Airport {
-	var indexUrl = aipdcs.fullURLDir + JapanAis.AipIndexPageName
+	var indexUrl = aipdcs.FullURLDir + JapanAis.AipIndexPageName
 	apts := []Airport{}
 
 	fmt.Println("   Retrieve Airports list from: " + indexUrl)
@@ -147,21 +147,21 @@ func (aipDoc *AipDocument) retrieveAirport(wg *sync.WaitGroup, h3html *goquery.S
 					ad := NewJpAirport()
 					ad.aipDocument = aipDoc
 					//ad.aipDocument = aipDoc
-					ad.icao = idId[5:9]
-					ad.title = ahtml.Text()[7:]
+					ad.Icao = idId[5:9]
+					ad.Title = ahtml.Text()[7:]
 					href, hrefEx := ahtml.Attr("href")
 					if hrefEx {
 						ad.link = href
 					}
 					ad.PdfData = []PdfData{}
-					fmt.Println(ad.icao)
-					fmt.Println(ad.title)
+					fmt.Println(ad.Icao)
+					fmt.Println(ad.Title)
 					ad.airport.DownloadPage(cl)
-					ad.GetPDFFromHTML(cl, aipDoc.fullURLDir)
+					ad.GetPDFFromHTML(cl, aipDoc.FullURLDir)
 					maps, i := ad.GetNavaids()
 					fmt.Println(maps)
 					fmt.Println(i)
-					aipDoc.airports = append(aipDoc.airports, *ad.Airport)
+					aipDoc.Airports = append(aipDoc.Airports, *ad.Airport)
 				}
 			}
 		}
@@ -170,9 +170,9 @@ func (aipDoc *AipDocument) retrieveAirport(wg *sync.WaitGroup, h3html *goquery.S
 
 func (aipDoc *AipDocument) DownloadAllAiportsHtmlPage(cl *http.Client) {
 	var docsWg sync.WaitGroup
-	for i, _ := range aipDoc.airports {
+	for i, _ := range aipDoc.Airports {
 		docsWg.Add(1)
-		apt := &aipDoc.airports[i]
+		apt := &aipDoc.Airports[i]
 		apt.aipDocument = aipDoc
 		apt.DownloadAirportPageSync(cl, &docsWg)
 	}
@@ -184,15 +184,15 @@ func (aipDoc *AipDocument) DownloadAllAiportsData(client *http.Client) {
 
 	var w int
 	var docsWg sync.WaitGroup
-	for i, _ := range aipDoc.airports {
+	for i, _ := range aipDoc.Airports {
 		docsWg.Add(1)
 
-		apt := &aipDoc.airports[i]
+		apt := &aipDoc.Airports[i]
 		apt.aipDocument = aipDoc //refresh the pointer (case we miss something)
 		//create the workers. the number is limited by 5 at the time being
 		if w < 5 {
 			w = w + 1
-			go worker(w, aipDoc.fullURLDir, client, jobs)
+			go worker(w, aipDoc.FullURLDir, client, jobs)
 		}
 
 		DownloadAndMergeAiportData(apt, &jobs, &docsWg, false)

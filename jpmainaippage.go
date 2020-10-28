@@ -99,12 +99,12 @@ func getActiveAipDocument(mainaip io.ReadCloser) AipDocs {
 
 					//after review of the cells, there is enough data to create an AipDocument
 					//create the aipdoc
-					aipdoc.effectiveDate = effectiveDate
-					aipdoc.publicationDate = publicationDate
-					aipdoc.partialURL = partialURL
-					aipdoc.fullURLPage = JapanAis.MainAipActiveURL + partialURL
-					u := strings.LastIndex(aipdoc.fullURLPage, "/")
-					aipdoc.fullURLDir = aipdoc.fullURLPage[:u+1]
+					aipdoc.EffectiveDate = effectiveDate
+					aipdoc.PublicationDate = publicationDate
+					aipdoc.PartialURL = partialURL
+					aipdoc.FullURLPage = JapanAis.MainAipActiveURL + partialURL
+					u := strings.LastIndex(aipdoc.FullURLPage, "/")
+					aipdoc.FullURLDir = aipdoc.FullURLPage[:u+1]
 
 					//identify the most recent but applicable document
 					if effectiveDate.Before(time.Now()) {
@@ -117,9 +117,9 @@ func getActiveAipDocument(mainaip io.ReadCloser) AipDocs {
 					//the current date (used for the identification by a dot in the table by using javascript) and the
 					//effective date shall be the same
 					if effectiveDate.Equal(currentDate) {
-						aipdoc.isValidDate = true
+						aipdoc.IsValidDate = true
 					} else {
-						aipdoc.isValidDate = false
+						aipdoc.IsValidDate = false
 					}
 
 					//confirm the url is in accordance with the dates
@@ -136,9 +136,9 @@ func getActiveAipDocument(mainaip io.ReadCloser) AipDocs {
 						panic(err)
 					}
 					if effectiveDate.Equal(effDateURL) && publicationDate.Equal(pubDateURL) {
-						aipdoc.isPartialURLValid = true
+						aipdoc.IsPartialURLValid = true
 					} else {
-						aipdoc.isPartialURLValid = false
+						aipdoc.IsPartialURLValid = false
 					}
 
 					//add the aipDoc to the list
@@ -166,11 +166,11 @@ func (docs *AipDocs) setActiveAipDoc(targetDate time.Time) {
 	var activeDocs AipDocs
 
 	for _, aipdoc := range *docs {
-		if aipdoc.effectiveDate.Equal(targetDate) {
+		if aipdoc.EffectiveDate.Equal(targetDate) {
 			//This will identify the document having an effective date in accordance with the target date.
 			//several documents could be identified as active
-			if aipdoc.isPartialURLValid && aipdoc.isValidDate {
-				aipdoc.isActive = true
+			if aipdoc.IsPartialURLValid && aipdoc.IsValidDate {
+				aipdoc.IsActive = true
 				countActive = countActive + 1
 				activeDocs = append(activeDocs, aipdoc)
 			}
@@ -186,7 +186,7 @@ func (docs *AipDocs) getActiveAipDoc() *AipDocument {
 	var counter int
 	var activeDoc *AipDocument
 	for _, aipdoc := range *docs {
-		if aipdoc.isActive {
+		if aipdoc.IsActive {
 			counter++
 			activeDoc = aipdoc
 			activeDocs = append(activeDocs, activeDoc)
@@ -204,25 +204,25 @@ func (docs *AipDocs) getActiveAipDoc() *AipDocument {
 	//for the other cases, need to sort by publication date
 	//the active documents to retrieve the most recent document
 	sort.SliceStable(activeDocs, func(i, j int) bool {
-		return activeDocs[i].publicationDate.After(activeDocs[j].publicationDate)
+		return activeDocs[i].PublicationDate.After(activeDocs[j].PublicationDate)
 	})
 
 	activeDoc = activeDocs[0]
 
 	for i, d := range *docs {
 		if i > 0 {
-			d.isActive = false
+			d.IsActive = false
 		}
 	}
-	fmt.Printf("Selected Active document is effective date: %s - publication date %s \n", activeDoc.effectiveDate, activeDoc.publicationDate)
+	fmt.Printf("Selected Active document is effective date: %s - publication date %s \n", activeDoc.EffectiveDate, activeDoc.PublicationDate)
 	return activeDoc
 }
 
 func (docs AipDocs) printAipDoc() {
 	for _, doc := range docs {
 		fmt.Println("Effective Date")
-		fmt.Println(doc.effectiveDate)
-		fmt.Println(doc.isActive)
+		fmt.Println(doc.EffectiveDate)
+		fmt.Println(doc.IsActive)
 	}
 }
 
@@ -325,13 +325,13 @@ func getPublicationDateFromPartialURL(pth string) (time.Time, error) {
 func (docs AipDocs) GetNextDate(actDoc AipDocument) time.Time {
 
 	sort.SliceStable(docs, func(i, j int) bool {
-		return docs[i].effectiveDate.Before(docs[j].effectiveDate)
+		return docs[i].EffectiveDate.Before(docs[j].EffectiveDate)
 	})
 
 	for _, d := range docs {
-		if d.effectiveDate.After(actDoc.effectiveDate) {
-			fmt.Printf("Next date is %s \n", d.effectiveDate)
-			return d.effectiveDate
+		if d.EffectiveDate.After(actDoc.EffectiveDate) {
+			fmt.Printf("Next date is %s \n", d.EffectiveDate)
+			return d.EffectiveDate
 		}
 	}
 	log.Panic("Unable to identify the next date")

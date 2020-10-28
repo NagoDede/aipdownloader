@@ -29,7 +29,7 @@ func worker(id int, url string, client *http.Client, jobs chan *PdfData) {
 
 		j.parentAirport.wg.Done() //set the task done in the airport working group
 		j.parentAirport.nbDownloaded = j.parentAirport.nbDownloaded + 1
-		fmt.Printf("%s downloaded %d / %d \n", j.parentAirport.icao, j.parentAirport.nbDownloaded, len(j.parentAirport.PdfData))
+		fmt.Printf("%s downloaded %d / %d \n", j.parentAirport.Icao, j.parentAirport.nbDownloaded, len(j.parentAirport.PdfData))
 
 	}
 }
@@ -82,7 +82,7 @@ func DownloadAndMergeAiportData(apt *Airport, jobs *chan *PdfData, docWg *sync.W
 	//Ensures that we try at worst two times the download
 	if apt.downloadCount > 1 {
 		//fmt.Println("*******" + apt.icao + " cannot perform the Merge process effciently - stop")
-		log.Fatal("*******" + apt.icao + " cannot perform the Merge process effciently - stop")
+		log.Fatal("*******" + apt.Icao + " cannot perform the Merge process effciently - stop")
 	}
 
 	DownloadAiportData(apt, jobs, force)
@@ -94,12 +94,12 @@ func DownloadAndMergeAiportData(apt *Airport, jobs *chan *PdfData, docWg *sync.W
 	//But it provides a complementary means of verification$
 	//Merge only if there is more than one file.
 	if apt.DetermmineIsDownloaded() {
-		fmt.Println("Airport: " + apt.icao + " all docs downloaded confirmed.")
+		fmt.Println("Airport: " + apt.Icao + " all docs downloaded confirmed.")
 		if len(apt.PdfData) > 1 {
-			fmt.Printf("     Airport: %s merging files (%d). \n", apt.icao, len(apt.PdfData))
+			fmt.Printf("     Airport: %s merging files (%d). \n", apt.Icao, len(apt.PdfData))
 			err := MergePdfDataOfAiport(apt)
 			if err != nil {
-				fmt.Println("     Problem on Airport: %s download again. \n", apt.icao)
+				fmt.Println("     Problem on Airport: %s download again. \n", apt.Icao)
 				DownloadAndMergeAiportData(apt, jobs, docWg, true)
 			} else {
 				//All the airport downloads and merge have been done. The airport can be remove of the waiting group
@@ -108,11 +108,11 @@ func DownloadAndMergeAiportData(apt *Airport, jobs *chan *PdfData, docWg *sync.W
 		} else if len(apt.PdfData) == 1 {
 			//copy the file in the merge directory
 			outPath := apt.aipDocument.DirMergeFiles()
-			outFullMerge := MergedData{fileName: apt.icao + "_full.pdf", fileDirectory: outPath}
+			outFullMerge := MergedData{fileName: apt.Icao + "_full.pdf", fileDirectory: outPath}
 			opth := filepath.Join(outFullMerge.fileDirectory, outFullMerge.fileName)
 			_, err := Copy(apt.PdfData[0].FilePath(), opth)
 			if err != nil {
-				fmt.Println("     Problem with Airport: %s unable to copy in %s. \n", apt.icao, opth)
+				fmt.Println("     Problem with Airport: %s unable to copy in %s. \n", apt.Icao, opth)
 				fmt.Println("       Download file(s) again")
 				DownloadAndMergeAiportData(apt, jobs, docWg, true)
 			} else {
@@ -121,11 +121,11 @@ func DownloadAndMergeAiportData(apt *Airport, jobs *chan *PdfData, docWg *sync.W
 			}
 
 		} else {
-			log.Printf("No PDF file for %s \n", apt.icao)
+			log.Printf("No PDF file for %s \n", apt.Icao)
 		}
 	} else {
 		//all the files have not been downloaded. Start again the download...
-		fmt.Println("*******" + apt.icao + " is not completed. No PDF merge done. Start a New download")
+		fmt.Println("*******" + apt.Icao + " is not completed. No PDF merge done. Start a New download")
 		DownloadAndMergeAiportData(apt, jobs, docWg, true)
 	}
 
@@ -136,7 +136,7 @@ func DownloadAiportData(apt *Airport, jobs *chan *PdfData, force bool) {
 	di, err := os.Stat(apt.DirDownload())
 	//determine if the target directory exists, or was created before the effective date.
 	// Also, if force is done, all the files will be donwloaded again.
-	if force || os.IsNotExist(err) || di.ModTime().Before(apt.aipDocument.effectiveDate) {
+	if force || os.IsNotExist(err) || di.ModTime().Before(apt.aipDocument.EffectiveDate) {
 		//create the directory
 		os.MkdirAll(apt.DirDownload(), os.ModePerm)
 		//the directory does not exist or is not up to date
@@ -163,7 +163,7 @@ func DownloadAiportData(apt *Airport, jobs *chan *PdfData, force bool) {
 				//As there is one directory by effective Date, there is no specific
 				//ned to check if the file is after the next effective date.
 				//This check is only to be sur that the directory is well up to date
-				if fi.ModTime().Before(apt.aipDocument.effectiveDate) {
+				if fi.ModTime().Before(apt.aipDocument.EffectiveDate) {
 					*jobs <- &(apt.PdfData[i])
 					apt.wg.Add(1) //add to the working group
 				} else {

@@ -11,17 +11,18 @@ import (
 )
 
 type AipDocument struct {
-	isActive          bool
-	effectiveDate     time.Time
-	publicationDate   time.Time
-	nextEffectiveDate time.Time
-	isValidDate       bool
-	partialURL        string
-	isPartialURLValid bool
-	fullURLDir        string
-	fullURLPage       string
-	airports          []Airport
-	countryCode       string
+	IsActive          bool
+	EffectiveDate     time.Time
+	PublicationDate   time.Time
+	NextEffectiveDate time.Time
+	ProcessDate       time.Time		
+	IsValidDate       bool
+	PartialURL        string
+	IsPartialURLValid bool
+	FullURLDir        string
+	FullURLPage       string
+	Airports          []Airport
+	CountryCode       string
 }
 
 type AipDocumentInterface interface {
@@ -30,8 +31,8 @@ type AipDocumentInterface interface {
 }
 
 func (aip *AipDocument) DirMainDownload() string {
-	dir := filepath.Join(ConfData.MainLocalDir, aip.countryCode)
-	t := aip.effectiveDate
+	dir := filepath.Join(ConfData.MainLocalDir, aip.CountryCode)
+	t := aip.EffectiveDate
 	dateDir := fmt.Sprintf("%d%02d%02d", t.Year(), t.Month(), t.Day())
 	return filepath.Join(dir, dateDir)
 }
@@ -46,7 +47,7 @@ func (aip *AipDocument) TestFtp() {
 	ftpClient, _ := NewFtpClient(&ftpI)
 
 	//Delete the directory to start from scracth and be sure to have the latest files
-	remoteDir := filepath.Join(ftpI.Directory, aip.countryCode, "RORA_full.pdf")
+	remoteDir := filepath.Join(ftpI.Directory, aip.CountryCode, "RORA_full.pdf")
 	fmt.Printf("Delete FTP Directory: %s \n", remoteDir)
 	entries, _ := ftpClient.List(filepath.ToSlash(remoteDir))
 	fmt.Println(entries)
@@ -61,7 +62,7 @@ func (aip *AipDocument) SentToFtp() {
 	ftpClient, _ := NewFtpClient(&ftpI)
 
 	//Delete the directory to start from scracth and be sure to have the latest files
-	remoteDir := filepath.Join(ftpI.Directory, aip.countryCode)
+	remoteDir := filepath.Join(ftpI.Directory, aip.CountryCode)
 	fmt.Printf("Do we need to delete FTP Directory %s ?\n", remoteDir)
 	entries, err := ftpClient.List(filepath.ToSlash(remoteDir))
 	if err != nil {
@@ -73,7 +74,7 @@ func (aip *AipDocument) SentToFtp() {
 		if len(entries) > 0 {
 			//keep the directory is the creation date is in accordance with the effective date
 			e := entries[len(entries)-1]
-			if e.Time.After(aip.effectiveDate) && e.Time.Before(aip.nextEffectiveDate) {
+			if e.Time.After(aip.EffectiveDate) && e.Time.Before(aip.NextEffectiveDate) {
 				fmt.Println("Keep current directory")
 			} else {
 				fmt.Println("Delete outdated directory %s \n", remoteDir)
@@ -94,7 +95,7 @@ func (aip *AipDocument) SentToFtp() {
 	nameList = nameList[2:] //remove the ".." and '.'
 
 	if len(nameList) == 0 {
-		for _, apt := range aip.airports {
+		for _, apt := range aip.Airports {
 			for _, chrt := range apt.MergePdf {
 				remotePath := filepath.Join(remoteDir, chrt.fileName)
 				inPath := filepath.Join(chrt.fileDirectory, chrt.fileName)
@@ -102,7 +103,7 @@ func (aip *AipDocument) SentToFtp() {
 			}
 		}
 	} else {
-		for _, apt := range aip.airports {
+		for _, apt := range aip.Airports {
 			for _, chrt := range apt.MergePdf {
 				remotePath := filepath.Join(remoteDir, chrt.fileName)
 				inPath := filepath.Join(chrt.fileDirectory, chrt.fileName)

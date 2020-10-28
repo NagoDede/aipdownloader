@@ -36,7 +36,7 @@ func (apt *JpAirport) GetPDFFromHTML(cl *http.Client, aipURLDir string) {
 
 	apt.downloadCount = 0 //reinit the download counter
 	var indexUrl = aipURLDir + apt.link
-	divWord := `div[id="` + apt.icao + "-AD-2.24" + `"]`
+	divWord := `div[id="` + apt.Icao + "-AD-2.24" + `"]`
 
 	fmt.Println("     Retrieve PDF pathes from: " + indexUrl)
 	resp, err := cl.Get(indexUrl)
@@ -74,8 +74,8 @@ func (apt *JpAirport) GetTxtPDFFile() PdfData {
 	pdfTxt := PdfData{}
 	pdfTxt.parentAirport = apt.Airport
 	pdfTxt.dataContentType = "Text"
-	pdfTxt.link = fmt.Sprintf("pdf/JP-AD-2-%s-en-JP.pdf", apt.icao)
-	pdfTxt.fileName = fmt.Sprintf("JP-AD-2-%s-en-JP.pdf", apt.icao)
+	pdfTxt.link = fmt.Sprintf("pdf/JP-AD-2-%s-en-JP.pdf", apt.Icao)
+	pdfTxt.fileName = fmt.Sprintf("JP-AD-2-%s-en-JP.pdf", apt.Icao)
 
 	return pdfTxt
 }
@@ -96,7 +96,7 @@ func (apt *JpAirport) GetNavaids() (map[string]Navaid, int) {
 		return nil, 0
 	}
 	//div[id="ENR-4details"]`
-	divId := fmt.Sprintf(`div[id="%s-AD-2.19"]`, apt.icao)
+	divId := fmt.Sprintf(`div[id="%s-AD-2.19"]`, apt.Icao)
 	//divId := `div=["` + apt.icao + "-AD-2.19" + `"]`
 
 	f, err := os.Open(apt.htmlPage)
@@ -165,7 +165,7 @@ func (apt *JpAirport) loadNavaidsFromTr(tr *goquery.Selection) (Navaid, bool) {
 		if (n.id != "") && (n.id != "-") {
 			n.key = n.id + " " + n.navaidType
 		} else {
-			n.key = apt.icao + " " + n.navaidType
+			n.key = apt.Icao + " " + n.navaidType
 		}
 
 	})

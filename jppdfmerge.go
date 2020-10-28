@@ -16,7 +16,7 @@ func MergePdfDataOfAiport(apt *Airport) error {
 	pdfWriter := pdf.NewPdfWriter()
 	pdf.SetPdfCreationDate(time.Now())
 	pdf.SetPdfAuthor("Nagoy Dede")
-	pdf.SetPdfKeywords(apt.icao + " AIP Japan")
+	pdf.SetPdfKeywords(apt.Icao + " AIP Japan")
 	pdf.SetPdfProducer("AipDownloader")
 
 	outPath = apt.aipDocument.DirMergeFiles()
@@ -24,17 +24,17 @@ func MergePdfDataOfAiport(apt *Airport) error {
 	//create the directory
 	os.MkdirAll(outPath, os.ModePerm)
 
-	outFullMerge := MergedData{fileName: apt.icao + "_full.pdf", fileDirectory: outPath}
+	outFullMerge := MergedData{fileName: apt.Icao + "_full.pdf", fileDirectory: outPath}
 	apt.MergePdf = append(apt.MergePdf, outFullMerge)
-	outChartMerge := MergedData{fileName: apt.icao + "_chart.pdf", fileDirectory: outPath}
+	outChartMerge := MergedData{fileName: apt.Icao + "_chart.pdf", fileDirectory: outPath}
 	apt.MergePdf = append(apt.MergePdf, outChartMerge)
 
-	outFullPath := filepath.Join(outPath, apt.icao+"_full.pdf")
-	outChartPath := filepath.Join(outPath, apt.icao+"_chart.pdf")
+	outFullPath := filepath.Join(outPath, apt.Icao+"_full.pdf")
+	outChartPath := filepath.Join(outPath, apt.Icao+"_chart.pdf")
 
 	//First create the Charts merge file
-	pdf.SetPdfTitle(apt.icao + "AIP charts ")
-	pdf.SetPdfSubject(apt.icao + " merged charts")
+	pdf.SetPdfTitle(apt.Icao + "AIP charts ")
+	pdf.SetPdfSubject(apt.Icao + " merged charts")
 	for _, pdfD := range apt.PdfData[1:] {
 		err := mergeInPdfWriter(&pdfWriter, &pdfD)
 		if err != nil {
@@ -50,8 +50,8 @@ func MergePdfDataOfAiport(apt *Airport) error {
 	}
 
 	//create the full merge
-	pdf.SetPdfTitle(apt.icao + " AIP document")
-	pdf.SetPdfSubject(apt.icao + " merged AIP document")
+	pdf.SetPdfTitle(apt.Icao + " AIP document")
+	pdf.SetPdfSubject(apt.Icao + " merged AIP document")
 	pdfFullWriter := pdf.NewPdfWriter()
 	for _, pdfD := range apt.PdfData {
 		err := mergeInPdfWriter(&pdfFullWriter, &pdfD)
@@ -149,7 +149,7 @@ func shouldUpdateMergePdfFile(apt *Airport, originFile string, pdfWriter *pdf.Pd
 
 		//determine if the dates are correct
 		//File shall be updated if the dates are outside the effective range
-		if st.ModTime().Before(apt.aipDocument.effectiveDate) || st.ModTime().After(apt.aipDocument.nextEffectiveDate) {
+		if st.ModTime().Before(apt.aipDocument.EffectiveDate) || st.ModTime().After(apt.aipDocument.NextEffectiveDate) {
 			return true
 		}
 

@@ -4,8 +4,9 @@
     "password": "password",
     "userID":   "userID"
     },
-"loginPage": "https://aisjapan.mlit.go.jp/LoginAction.do",
-"mainAipPage": "https://aisjapan.mlit.go.jp/html/AIP/html/DomesticAIP.do",
-"mainAipActiveURL": "https://aisjapan.mlit.go.jp/html/AIP/html/",
-"countryDir": "Japan"
+    "loginPage": "https://aisjapan.mlit.go.jp/LoginAction.do",
+    "mainAipPage": "https://aisjapan.mlit.go.jp/html/AIP/html/DomesticAIP.do",
+    "mainAipActiveURL": "https://aisjapan.mlit.go.jp/html/AIP/html/",
+    "countryDir": "Japan",
+    "aipIndexPageName":  "JP-menu-en-JP.html"
 }
