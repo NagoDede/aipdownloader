@@ -1,4 +1,5 @@
-package main
+package generic
+
 
 import (
 	"encoding/json"

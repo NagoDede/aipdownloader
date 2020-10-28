@@ -1,6 +1,3 @@
-// In this example we'll look at how to implement
-// a _worker pool_ using goroutines and channels.
-
 package main
 
 import (
@@ -12,6 +9,7 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+	"aiploader/generic"
 )
 
 // Here's the worker, of which we'll run several

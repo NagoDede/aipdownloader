@@ -2,16 +2,17 @@ package main
 
 import (
 	"fmt"
+	generic "aiploader/generic"
 )
 
 func main() {
 
 	//ConnectMongo()
 
-	ConfData = configurationDataStruct{}
+	generic.ConfData = configurationDataStruct{}
 	JapanAis = JpData{}
 	fmt.Println("AIP Downloader is starting")
-	ConfData.LoadConfigurationFile("./aipdownloader.json")
+	generic.ConfData.LoadConfigurationFile("./aipdownloader.json")
 	fmt.Printf("Data will be stored in %s \n", ConfData.MainLocalDir)
 
 	JapanAis.LoadJsonFile("./japan.json")
