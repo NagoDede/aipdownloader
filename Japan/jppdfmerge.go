@@ -1,4 +1,4 @@
-package main
+package japan
 
 import (
 	"fmt"
@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/NagoDede/aipdownloader/generic"
 	pdf "github.com/NagoDede/unipdf/model"
-	"github.com/orcaman/writerseeker"
+	"github.com/NagoDede/aipdownloader/writerseeker"
 )
 
-//pdf "github.com/unidoc/unipdf/v3/model"
-func MergePdfDataOfAiport(apt *Airport) error {
+func MergePdfDataOfAiport(apt *generic.Airport) error {
 	var outPath string
 	pdfWriter := pdf.NewPdfWriter()
 	pdf.SetPdfCreationDate(time.Now())
@@ -20,14 +20,14 @@ func MergePdfDataOfAiport(apt *Airport) error {
 	pdf.SetPdfKeywords(apt.Icao + " AIP Japan")
 	pdf.SetPdfProducer("AipDownloader")
 
-	outPath = apt.aipDocument.DirMergeFiles()
+	outPath = apt.AipDocument.DirMergeFiles()
 
 	//create the directory
 	os.MkdirAll(outPath, os.ModePerm)
 
-	outFullMerge := MergedData{fileName: apt.Icao + "_full.pdf", fileDirectory: outPath}
+	outFullMerge := generic.MergedData{FileName: apt.Icao + "_full.pdf", FileDirectory: outPath}
 	apt.MergePdf = append(apt.MergePdf, outFullMerge)
-	outChartMerge := MergedData{fileName: apt.Icao + "_chart.pdf", fileDirectory: outPath}
+	outChartMerge := generic.MergedData{FileName: apt.Icao + "_chart.pdf", FileDirectory: outPath}
 	apt.MergePdf = append(apt.MergePdf, outChartMerge)
 
 	outFullPath := filepath.Join(outPath, apt.Icao+"_full.pdf")
@@ -72,8 +72,8 @@ func MergePdfDataOfAiport(apt *Airport) error {
 
 }
 
-func mergeInPdfWriter(pdfWriter *pdf.PdfWriter, pdfD *PdfData) error {
-	inPath := pdfD.FilePath()
+func mergeInPdfWriter(pdfWriter *pdf.PdfWriter, pdfD *generic.PdfData) error {
+	inPath := pdfD.FilePath
 	f, err := os.Open(inPath)
 	if err != nil {
 		log.Println("Error during  os.Open(inPath) " + inPath)
@@ -145,12 +145,12 @@ func writePdfWriter(pdfWriter *pdf.PdfWriter, outPath string) error {
 //		- There is a discrepency in the number of pages of the originFile file and the pdfWriter; or
 //		- There is size discrepency between the originFile and the pdfWriter
 //Uncovered case, return true
-func shouldUpdateMergePdfFile(apt *Airport, originFile string, pdfWriter *pdf.PdfWriter) bool {
+func shouldUpdateMergePdfFile(apt *generic.Airport, originFile string, pdfWriter *pdf.PdfWriter) bool {
 	if st, err := os.Stat(originFile); err == nil {
 
 		//determine if the dates are correct
 		//File shall be updated if the dates are outside the effective range
-		if st.ModTime().Before(apt.aipDocument.EffectiveDate) || st.ModTime().After(apt.aipDocument.NextEffectiveDate) {
+		if st.ModTime().Before(apt.AipDocument.Document().EffectiveDate) || st.ModTime().After(apt.AipDocument.Document().NextEffectiveDate) {
 			return true
 		}
 

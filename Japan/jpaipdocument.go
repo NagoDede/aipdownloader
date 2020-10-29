@@ -1,4 +1,4 @@
-package main
+package japan
 
 import (
 	"fmt"
@@ -8,9 +8,15 @@ import (
 	"sync"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/NagoDede/aipdownloader/generic"
 )
 
-func (aipdcs *AipDocument) GetNavaids(cl *http.Client) []Navaid {
+type JpAipDocument struct {
+	generic.AipDocument
+	Airports          []JpAirport
+}
+
+func (aipdcs *JpAipDocument) GetNavaids(cl *http.Client) []generic.Navaid {
 	var indexUrl = aipdcs.FullURLDir + JapanAis.AipIndexPageName
 	fmt.Println("   Retrieve RadioNavigation  in " + indexUrl)
 	resp, err := cl.Get(indexUrl)
@@ -65,9 +71,9 @@ func (aipdcs *AipDocument) GetNavaids(cl *http.Client) []Navaid {
 	}
 }
 
-func loadNavaidsFromHtmlDoc(navaidsdoc *goquery.Document) (map[string]Navaid, int) {
+func loadNavaidsFromHtmlDoc(navaidsdoc *goquery.Document) (map[string]generic.Navaid, int) {
 	//navs := //[]Navaid{}
-	var navs = make(map[string]Navaid)
+	var navs = make(map[string]generic.Navaid)
 	trCount := 0
 	navaidsdoc.Find(`table`).Each(func(index int, divhtml *goquery.Selection) {
 		tbody := divhtml.Find(`tbody`).First()
@@ -77,13 +83,13 @@ func loadNavaidsFromHtmlDoc(navaidsdoc *goquery.Document) (map[string]Navaid, in
 			if titleEx {
 				fmt.Println(id)
 				if strings.HasPrefix(id, "NAV-") {
-					nav := Navaid{}
+					nav := generic.Navaid{}
 					nav.SetFromHtmlSelection(tr)
-					if nav.key != "" {
-						if val, ok := navs[nav.key]; ok {
-							log.Printf("%s appears several time", val.key)
+					if nav.Key != "" {
+						if val, ok := navs[nav.Key]; ok {
+							log.Printf("%s appears several time", val.Key)
 						} else {
-							navs[nav.key] = nav
+							navs[nav.Key] = nav
 							trCount++
 						}
 					} else {
@@ -99,9 +105,8 @@ func loadNavaidsFromHtmlDoc(navaidsdoc *goquery.Document) (map[string]Navaid, in
 	return navs, trCount
 }
 
-func (aipdcs *AipDocument) GetAirports(cl *http.Client) []Airport {
+func (aipdcs *JpAipDocument) LoadAirports(cl *http.Client) {
 	var indexUrl = aipdcs.FullURLDir + JapanAis.AipIndexPageName
-	apts := []Airport{}
 
 	fmt.Println("   Retrieve Airports list from: " + indexUrl)
 	resp, err := cl.Get(indexUrl)
@@ -133,10 +138,9 @@ func (aipdcs *AipDocument) GetAirports(cl *http.Client) []Airport {
 			fmt.Println("Main: Completed")
 		}
 	}
-	return apts
 }
 
-func (aipDoc *AipDocument) retrieveAirport(wg *sync.WaitGroup, h3html *goquery.Selection, cl *http.Client) {
+func (aipDoc *JpAipDocument) retrieveAirport(wg *sync.WaitGroup, h3html *goquery.Selection, cl *http.Client) {
 	defer wg.Done()
 	h3html.Find("a").Each(func(index int, ahtml *goquery.Selection) {
 		idAd, exist := ahtml.Attr("title")
@@ -144,43 +148,41 @@ func (aipDoc *AipDocument) retrieveAirport(wg *sync.WaitGroup, h3html *goquery.S
 			if strings.Contains(idAd, "AERO") || strings.Contains(idAd, "aero") {
 				idId, idEx := ahtml.Attr("id")
 				if idEx {
-					ad := NewJpAirport()
-					ad.aipDocument = aipDoc
-					//ad.aipDocument = aipDoc
+					ad := JpAirport{}
+					ad.AipDocument = aipDoc
+					
 					ad.Icao = idId[5:9]
 					ad.Title = ahtml.Text()[7:]
 					href, hrefEx := ahtml.Attr("href")
 					if hrefEx {
-						ad.link = href
+						ad.Link = href
 					}
-					ad.PdfData = []PdfData{}
+					ad.PdfData = []generic.PdfData{}
 					fmt.Println(ad.Icao)
 					fmt.Println(ad.Title)
-					ad.airport.DownloadPage(cl)
+					ad.DownloadPage(cl)
 					ad.GetPDFFromHTML(cl, aipDoc.FullURLDir)
-					maps, i := ad.GetNavaids()
-					fmt.Println(maps)
-					fmt.Println(i)
-					aipDoc.Airports = append(aipDoc.Airports, *ad.Airport)
+					//maps, i := ad.GetNavaids()
+					aipDoc.Airports = append(aipDoc.Airports, ad)
 				}
 			}
 		}
 	})
 }
 
-func (aipDoc *AipDocument) DownloadAllAiportsHtmlPage(cl *http.Client) {
+func (aipDoc *JpAipDocument) DownloadAllAiportsHtmlPage(cl *http.Client) {
 	var docsWg sync.WaitGroup
 	for i, _ := range aipDoc.Airports {
 		docsWg.Add(1)
 		apt := &aipDoc.Airports[i]
-		apt.aipDocument = aipDoc
-		apt.DownloadAirportPageSync(cl, &docsWg)
+		apt.AipDocument = aipDoc
+		generic.DownloadAirportPageSync(cl, &docsWg, apt)
 	}
 	docsWg.Wait()
 }
 
-func (aipDoc *AipDocument) DownloadAllAiportsData(client *http.Client) {
-	jobs := make(chan *PdfData, 10)
+func (aipDoc *JpAipDocument) DownloadAllAiportsData(client *http.Client) {
+	jobs := make(chan *generic.PdfData, 10)
 
 	var w int
 	var docsWg sync.WaitGroup
@@ -188,14 +190,14 @@ func (aipDoc *AipDocument) DownloadAllAiportsData(client *http.Client) {
 		docsWg.Add(1)
 
 		apt := &aipDoc.Airports[i]
-		apt.aipDocument = aipDoc //refresh the pointer (case we miss something)
+		apt.AipDocument = aipDoc //refresh the pointer (case we miss something)
 		//create the workers. the number is limited by 5 at the time being
 		if w < 5 {
 			w = w + 1
 			go worker(w, aipDoc.FullURLDir, client, jobs)
 		}
 
-		DownloadAndMergeAiportData(apt, &jobs, &docsWg, false)
+		DownloadAndMergeAiportData(&apt.Airport, &jobs, &docsWg, false)
 	}
 	docsWg.Wait()
 

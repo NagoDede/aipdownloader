@@ -1,4 +1,4 @@
-package main
+package japan
 
 import (
 	"fmt"
@@ -9,7 +9,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
-	"aiploader/generic"
+	"github.com/NagoDede/aipdownloader/generic"
+
 )
 
 // Here's the worker, of which we'll run several
@@ -17,17 +18,17 @@ import (
 // work on the `jobs` channel and send the corresponding
 // results on `results`. We'll sleep a second per job to
 // simulate an expensive task.
-func worker(id int, url string, client *http.Client, jobs chan *PdfData) {
+func worker(id int, url string, client *http.Client, jobs chan *generic.PdfData) {
 
 	for j := range jobs {
 
-		mainUrl := url + j.link
-		status := downloadPDF(mainUrl, j.FilePath(), client)
-		j.downloadStatus = status
+		mainUrl := url + j.Link
+		status := downloadPDF(mainUrl, j.FilePath, client)
+		j.DownloadStatus = status
 
-		j.parentAirport.wg.Done() //set the task done in the airport working group
-		j.parentAirport.nbDownloaded = j.parentAirport.nbDownloaded + 1
-		fmt.Printf("%s downloaded %d / %d \n", j.parentAirport.Icao, j.parentAirport.nbDownloaded, len(j.parentAirport.PdfData))
+		j.ParentAirport.Wg.Done() //set the task done in the airport working group
+		j.ParentAirport.NbDownloaded = j.ParentAirport.NbDownloaded + 1
+		fmt.Printf("%s downloaded %d / %d \n", j.ParentAirport.Icao, j.ParentAirport.NbDownloaded, len(j.ParentAirport.PdfData))
 
 	}
 }
@@ -73,19 +74,19 @@ func downloadPDF(url string, pathFile string, client *http.Client) bool {
 // After download, the pdf data files are merged together in order to create _full pdf file and _chart pdf file.
 // If for any reason the merge fails (mainly for file problem), a new download is performed for all the airport data.
 // This new download is done only one time.
-func DownloadAndMergeAiportData(apt *Airport, jobs *chan *PdfData, docWg *sync.WaitGroup, force bool) {
+func DownloadAndMergeAiportData(apt *generic.Airport, jobs *chan *generic.PdfData, docWg *sync.WaitGroup, force bool) {
 
 	//reset the number of pdf files downloaded
-	apt.nbDownloaded = 0
+	apt.NbDownloaded = 0
 	//Ensures that we try at worst two times the download
-	if apt.downloadCount > 1 {
+	if apt.DownloadCount > 1 {
 		//fmt.Println("*******" + apt.icao + " cannot perform the Merge process effciently - stop")
 		log.Fatal("*******" + apt.Icao + " cannot perform the Merge process effciently - stop")
 	}
 
 	DownloadAiportData(apt, jobs, force)
 	//wait the waiting group of the airport
-	apt.wg.Wait()
+	apt.Wg.Wait()
 
 	//merge the pdf data if everything was done
 	//thanks the Wait, the call of DetermineIsDownloaded is not mandatory.
@@ -105,10 +106,10 @@ func DownloadAndMergeAiportData(apt *Airport, jobs *chan *PdfData, docWg *sync.W
 			}
 		} else if len(apt.PdfData) == 1 {
 			//copy the file in the merge directory
-			outPath := apt.aipDocument.DirMergeFiles()
-			outFullMerge := MergedData{fileName: apt.Icao + "_full.pdf", fileDirectory: outPath}
-			opth := filepath.Join(outFullMerge.fileDirectory, outFullMerge.fileName)
-			_, err := Copy(apt.PdfData[0].FilePath(), opth)
+			outPath := apt.AipDocument.DirMergeFiles()
+			outFullMerge := generic.MergedData{FileName: apt.Icao + "_full.pdf", FileDirectory: outPath}
+			opth := filepath.Join(outFullMerge.FileDirectory, outFullMerge.FileName)
+			_, err := Copy(apt.PdfData[0].FilePath, opth)
 			if err != nil {
 				fmt.Println("     Problem with Airport: %s unable to copy in %s. \n", apt.Icao, opth)
 				fmt.Println("       Download file(s) again")
@@ -129,16 +130,16 @@ func DownloadAndMergeAiportData(apt *Airport, jobs *chan *PdfData, docWg *sync.W
 
 }
 
-func DownloadAiportData(apt *Airport, jobs *chan *PdfData, force bool) {
+func DownloadAiportData(apt *generic.Airport, jobs *chan *generic.PdfData, force bool) {
 
 	di, err := os.Stat(apt.DirDownload())
 	//determine if the target directory exists, or was created before the effective date.
 	// Also, if force is done, all the files will be donwloaded again.
-	if force || os.IsNotExist(err) || di.ModTime().Before(apt.aipDocument.EffectiveDate) {
+	if force || os.IsNotExist(err) || di.ModTime().Before(apt.AipDocument.Document().EffectiveDate) {
 		//create the directory
 		os.MkdirAll(apt.DirDownload(), os.ModePerm)
 		//the directory does not exist or is not up to date
-		apt.setPdfDataListInChannel(jobs)
+		apt.SetPdfDataListInChannel(jobs)
 
 		//set the directory time to the cuurent date
 		if err := os.Chtimes(apt.DirDownload(), time.Now(), time.Now()); err != nil {
@@ -148,25 +149,25 @@ func DownloadAiportData(apt *Airport, jobs *chan *PdfData, force bool) {
 	} else if err == nil {
 		//if directory exists, then case by case in regard of the file description
 		for i := range apt.PdfData {
-			apt.PdfData[i].parentAirport = apt
-			filePth := apt.PdfData[i].FilePath()
+			apt.PdfData[i].ParentAirport = apt
+			filePth := apt.PdfData[i].FilePath
 			fi, err := os.Stat(filePth)
 			if os.IsNotExist(err) {
 				//the files does not exist, download it
 
 				*jobs <- &(apt.PdfData[i])
-				apt.wg.Add(1) //add to the working group
+				apt.Wg.Add(1) //add to the working group
 			} else if err == nil {
 				//the file exists, check if the file is before the effectiveDate.
 				//As there is one directory by effective Date, there is no specific
 				//ned to check if the file is after the next effective date.
 				//This check is only to be sur that the directory is well up to date
-				if fi.ModTime().Before(apt.aipDocument.EffectiveDate) {
+				if fi.ModTime().Before(apt.AipDocument.Document().EffectiveDate) {
 					*jobs <- &(apt.PdfData[i])
-					apt.wg.Add(1) //add to the working group
+					apt.Wg.Add(1) //add to the working group
 				} else {
-					apt.PdfData[i].downloadStatus = true
-					apt.nbDownloaded = apt.nbDownloaded + 1
+					apt.PdfData[i].DownloadStatus = true
+					apt.NbDownloaded = apt.NbDownloaded + 1
 				}
 
 			} else if err != nil {

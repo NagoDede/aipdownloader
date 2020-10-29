@@ -8,16 +8,16 @@ import (
 
 // Navaids descvribes the navigation means available on the airport/
 type Navaid struct {
-	id              string
-	name            string
-	frequency       string
-	navaidType      string
-	magVar          string
-	operationsHours string
-	position        GeoPosition
-	elevation       string
-	remarks         string
-	key             string
+	Id              string
+	Name            string
+	Frequency       string
+	NavaidType      string
+	MagVar          string
+	OperationsHours string
+	Position        GeoPosition
+	Elevation       string
+	Remarks         string
+	Key             string
 }
 
 func (n *Navaid) SetFromHtmlSelection(tr *goquery.Selection) {
@@ -26,20 +26,20 @@ func (n *Navaid) SetFromHtmlSelection(tr *goquery.Selection) {
 		case 0:
 			n.setColumn0(td)
 		case 1:
-			n.id = td.Text()
+			n.Id = td.Text()
 		case 2:
-			n.frequency = td.Text()
+			n.Frequency = td.Text()
 		case 3:
-			n.operationsHours = td.Text()
+			n.OperationsHours = td.Text()
 		case 4:
 			//n.position = td.Text()
 			n.setColumn4(td)
 		case 5:
-			n.elevation = td.Text()
+			n.Elevation = td.Text()
 		case 6:
-			n.remarks = td.Text()
+			n.Remarks = td.Text()
 		}
-		n.key = n.id + " " + n.navaidType
+		n.Key = n.Id + " " + n.NavaidType
 	})
 }
 
@@ -52,12 +52,12 @@ func (n *Navaid) setColumn0(html *goquery.Selection) {
 
 	switch len(data) {
 	case 1:
-		n.navaidType = data[0]
-		n.name = fs[0 : len(fs)-len(data[0])]
+		n.NavaidType = data[0]
+		n.Name = fs[0 : len(fs)-len(data[0])]
 	case 2:
-		n.navaidType = data[0]
-		n.magVar = data[1]
-		n.name = fs[0 : len(fs)-len(data[0])-len(data[1])]
+		n.NavaidType = data[0]
+		n.MagVar = data[1]
+		n.Name = fs[0 : len(fs)-len(data[0])-len(data[1])]
 	}
 }
 
@@ -68,31 +68,31 @@ func (n *Navaid) setColumn4(html *goquery.Selection) {
 	})
 
 	if len(data) == 2 {
-		lat, err := convertDDMMSSSSLatitudeToFloat(data[0])
+		lat, err := ConvertDDMMSSSSLatitudeToFloat(data[0])
 		if err != nil {
-			log.Printf("%s Latitude Conversion problem %s \n", n.name, data[0])
+			log.Printf("%s Latitude Conversion problem %s \n", n.Name, data[0])
 			log.Println(err)
 		} else {
-			n.position.Latitude = lat
+			n.Position.Latitude = lat
 		}
 
-		long, err := convertDDDMMSSSSLongitudeToFloat(data[1])
+		long, err := ConvertDDDMMSSSSLongitudeToFloat(data[1])
 		if err != nil {
-			log.Printf("%s Longitude Conversion problem %s \n", n.name, data[1])
+			log.Printf("%s Longitude Conversion problem %s \n", n.Name, data[1])
 			log.Println(err)
 		} else {
-			n.position.Longitude = long
+			n.Position.Longitude = long
 		}
 	} else {
-		log.Printf("%s Conversion problem %s \n", n.name)
+		log.Printf("%s Conversion problem %s \n", n.Name)
 	}
 }
 
 func (n *Navaid) CompareTo(ext *Navaid) bool {
-	if n.key == ext.key {
+	if n.Key == ext.Key {
 		return true
 	} else {
-		if (n.id == ext.id) && (n.navaidType == ext.navaidType) {
+		if (n.Id == ext.Id) && (n.NavaidType == ext.NavaidType) {
 			return true
 		} else {
 			return false

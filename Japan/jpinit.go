@@ -1,4 +1,4 @@
-package main
+package japan
 
 import (
 	"encoding/json"
@@ -77,8 +77,8 @@ func (jpd *JpData) Process() {
 	activeAipDoc.GetNavaids(&client)
 
 	fmt.Println("Retrieve the Airports List")
-	activeAipDoc.GetAirports(&client)
-	activeAipDoc.DownloadAllAiportsHtmlPage(&client)
+	activeAipDoc.LoadAirports(&client)
+	//activeAipDoc.DownloadAllAiportsHtmlPage(&client)
 	fmt.Println("Number of identified airports: ")
 
 	fmt.Println("Download the Airports Data")
@@ -89,10 +89,7 @@ func (jpd *JpData) Process() {
 	if err != nil {
         log.Println(err)
     }
-	_ = ioutil.WriteFile("test.json", jsonData, 0644)
-	
-	//Send the PDF files to the FTP files
-	activeAipDoc.SentToFtp()
+	_ = ioutil.WriteFile("info.json", jsonData, 0644)
 }
 
 /**

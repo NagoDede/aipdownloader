@@ -15,14 +15,14 @@ type CountryAis interface {
 	Process()
 }
 
-type configurationDataStruct struct {
+type ConfigurationDataStruct struct {
 	MainLocalDir string
 	MergeDir     string
 }
 
-var ConfData configurationDataStruct
+var ConfData ConfigurationDataStruct
 
-func (cds *configurationDataStruct) LoadConfigurationFile(path string) {
+func (cds *ConfigurationDataStruct) LoadConfigurationFile(path string) {
 	// Open our jsonFile
 	jsonFile, err := os.Open(path)
 	// if we os.Open returns an error then handle it

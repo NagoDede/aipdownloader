@@ -1,4 +1,4 @@
-module aiploader
+module github.com/NagoDede/aipdownloader
 
 go 1.14
 

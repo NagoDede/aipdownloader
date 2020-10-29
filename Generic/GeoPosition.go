@@ -10,10 +10,10 @@ import (
 type GeoPosition struct {
 	Latitude  float32
 	Longitude float32
-	altitude  float32
+	Altitude  float32
 }
 
-func convertDDMMSSSSLatitudeToFloat(lat string) (float32, error) {
+func ConvertDDMMSSSSLatitudeToFloat(lat string) (float32, error) {
 	lat = strings.Trim(lat, " ")
 	var positiveSign bool
 	var deg int
@@ -86,7 +86,7 @@ func convertDDMMSSSSLatitudeToFloat(lat string) (float32, error) {
 	}
 }
 
-func convertDDDMMSSSSLongitudeToFloat(long string) (float32, error) {
+func ConvertDDDMMSSSSLongitudeToFloat(long string) (float32, error) {
 	long = strings.Trim(long, " ")
 	var positiveSign bool
 	var deg int

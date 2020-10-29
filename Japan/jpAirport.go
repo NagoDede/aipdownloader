@@ -1,4 +1,4 @@
-package main
+package japan
 
 import (
 	"fmt"
@@ -8,20 +8,59 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"io"
 
 	"path/filepath"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/NagoDede/aipdownloader/generic"
+
 )
 
 type JpAirport struct {
-	*Airport
+	generic.Airport
 }
+ 
+/*
+	Download the AIP webpage of the airport.
+	This webpage will be used to retrieve all the relevant information.
+	The path to the downloaded file will be indicated in the airport.htmlPage field.
+*/
+func (apt *JpAirport) DownloadPage(cl *http.Client) { //, aipURLDir string) {
 
-func NewJpAirport() *JpAirport {
-	ft := &JpAirport{&Airport{}}
-	ft.airport = ft
-	return ft
+	var indexURL = apt.AipDocument.Document().FullURLDir + apt.Link // aipURLDir + apt.link
+	fmt.Println("     Download the airport page: " + indexURL)
+	resp, err := cl.Get(indexURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer resp.Body.Close()
+
+	// HTTP GET request
+
+	filePth := filepath.Join(apt.DirDownload(), apt.Icao+".html")
+
+	if apt.ShouldIDownloadHtmlPage(filePth, resp.ContentLength) {
+		//create the directory
+		os.MkdirAll(apt.DirDownload(), os.ModePerm)
+		newFile, err := os.Create(filePth)
+		// Write bytes from HTTP response to file.
+		// response.Body satisfies the reader interface.
+		// newFile satisfies the writer interface.
+		// That allows us to use io.Copy which accepts
+		// any type that implements reader and writer interface
+
+		numBytesWritten, err := io.Copy(newFile, resp.Body)
+		if err != nil {
+			log.Printf("Unable to write the webpage %s in directory %s \n", indexURL, filePth)
+			log.Fatal(err)
+		}
+		log.Printf("Airport %s - downloaded %d byte file %s.\n", apt.Icao, numBytesWritten, filePth)
+	} else {
+		log.Printf("Airport %s - page %s not saved, local copy is good %s.\n", apt.Icao, indexURL, filePth)
+	}
+	apt.HtmlPage = filePth
 }
 
 // GetPDFFromHTML will retrieve the PDF information (which will be downloaded later) in a HTML
@@ -34,8 +73,8 @@ func NewJpAirport() *JpAirport {
 // the correct order. The name of the files is not sufficient to set them in the corect order
 func (apt *JpAirport) GetPDFFromHTML(cl *http.Client, aipURLDir string) {
 
-	apt.downloadCount = 0 //reinit the download counter
-	var indexUrl = aipURLDir + apt.link
+	apt.DownloadCount = 0 //reinit the download counter
+	var indexUrl = aipURLDir + apt.Link
 	divWord := `div[id="` + apt.Icao + "-AD-2.24" + `"]`
 
 	fmt.Println("     Retrieve PDF pathes from: " + indexUrl)
@@ -55,13 +94,15 @@ func (apt *JpAirport) GetPDFFromHTML(cl *http.Client, aipURLDir string) {
 	//create and retrieve the main PDF page
 	//the order shall be respected, else the page sequence could not be respected during the merge process
 	//So first, it is the text/description pdf
-	apt.PdfData = append(apt.PdfData, apt.GetTxtPDFFile())
+	apt.AddPdfData(apt.getTxtPDFFile())
+	//apt.PdfData = append(apt.PdfData, apt.getTxtPDFFile())
 
 	doc.Find(divWord).Each(func(index int, divhtml *goquery.Selection) {
 		divhtml.Find("a").Each(func(index int, ahtml *goquery.Selection) {
 			pdfLink, ext := ahtml.Attr("href")
 			if ext {
-				apt.PdfData = append(apt.PdfData, apt.GetChartPDFFile(pdfLink))
+				apt.AddPdfData(apt.getChartPDFFile(pdfLink))
+				//apt.PdfData = append(apt.PdfData, apt.getChartPDFFile(pdfLink))
 			}
 
 		})
@@ -70,28 +111,28 @@ func (apt *JpAirport) GetPDFFromHTML(cl *http.Client, aipURLDir string) {
 
 // mainPDFFile creates the path to the main PDF as there is no associated link in the webpage
 // and provides it in a PdfData structure (dataContentType is associated to Text)
-func (apt *JpAirport) GetTxtPDFFile() PdfData {
-	pdfTxt := PdfData{}
-	pdfTxt.parentAirport = apt.Airport
-	pdfTxt.dataContentType = "Text"
-	pdfTxt.link = fmt.Sprintf("pdf/JP-AD-2-%s-en-JP.pdf", apt.Icao)
-	pdfTxt.fileName = fmt.Sprintf("JP-AD-2-%s-en-JP.pdf", apt.Icao)
+func (apt *JpAirport) getTxtPDFFile() generic.PdfData {
+	pdfTxt := generic.PdfData{}
+	pdfTxt.ParentAirport = &apt.Airport
+	pdfTxt.DataContentType = "Text"
+	pdfTxt.Link = fmt.Sprintf("pdf/JP-AD-2-%s-en-JP.pdf", apt.Icao)
+	pdfTxt.FileName = fmt.Sprintf("JP-AD-2-%s-en-JP.pdf", apt.Icao)
 
 	return pdfTxt
 }
 
-func (apt *JpAirport) GetChartPDFFile(partialLink string) PdfData {
-	pdfChart := PdfData{}
-	pdfChart.parentAirport = apt.Airport
-	pdfChart.dataContentType = "Chart"
-	pdfChart.link = partialLink
-	pdfChart.fileName = filepath.Base(partialLink)
+func (apt *JpAirport) getChartPDFFile(partialLink string) generic.PdfData {
+	pdfChart := generic.PdfData{}
+	pdfChart.ParentAirport = &apt.Airport
+	pdfChart.DataContentType = "Chart"
+	pdfChart.Link = partialLink
+	pdfChart.FileName = filepath.Base(partialLink)
 	return pdfChart
 }
 
-func (apt *JpAirport) GetNavaids() (map[string]Navaid, int) {
+func (apt *JpAirport) GetNavaids() (map[string]generic.Navaid, int) {
 
-	if apt.htmlPage == "" {
+	if apt.HtmlPage == "" {
 		log.Println("Html File is not downloaded")
 		return nil, 0
 	}
@@ -99,9 +140,9 @@ func (apt *JpAirport) GetNavaids() (map[string]Navaid, int) {
 	divId := fmt.Sprintf(`div[id="%s-AD-2.19"]`, apt.Icao)
 	//divId := `div=["` + apt.icao + "-AD-2.19" + `"]`
 
-	f, err := os.Open(apt.htmlPage)
+	f, err := os.Open(apt.HtmlPage)
 	if err != nil {
-		log.Println("Unable to open " + apt.htmlPage)
+		log.Println("Unable to open " + apt.HtmlPage)
 	}
 	doc, err := goquery.NewDocumentFromReader(f)
 	if err != nil {
@@ -117,9 +158,9 @@ func (apt *JpAirport) GetNavaids() (map[string]Navaid, int) {
 	return navaids, trcount
 }
 
-func (apt *JpAirport) loadNavaidsFromHtmlDoc(div *goquery.Selection) (map[string]Navaid, int) {
+func (apt *JpAirport) loadNavaidsFromHtmlDoc(div *goquery.Selection) (map[string]generic.Navaid, int) {
 	//navs := //[]Navaid{}
-	apt.navaids = make(map[string]Navaid)
+	apt.Navaids = make(map[string]generic.Navaid)
 	trCount := 0
 	div.Find("table").Each(func(index int, divhtml *goquery.Selection) {
 		tbody := divhtml.Find(`tbody`).First()
@@ -127,45 +168,45 @@ func (apt *JpAirport) loadNavaidsFromHtmlDoc(div *goquery.Selection) (map[string
 		tbody.Find("tr").Each(func(index int, tr *goquery.Selection) {
 			aids, isok := apt.loadNavaidsFromTr(tr)
 			if isok {
-				apt.navaids[aids.key] = aids
+				apt.Navaids[aids.Key] = aids
 			}
 			fmt.Println(aids)
 		})
 	})
 
-	return apt.navaids, trCount
+	return apt.Navaids, trCount
 }
 
-func (apt *JpAirport) loadNavaidsFromTr(tr *goquery.Selection) (Navaid, bool) {
-	var n Navaid
+func (apt *JpAirport) loadNavaidsFromTr(tr *goquery.Selection) (generic.Navaid, bool) {
+	var n generic.Navaid
 	tr.Find("td").Each(func(index int, td *goquery.Selection) {
 		switch index {
 		case 0:
 
-			n.navaidType = strings.TrimSpace(td.Text())
-			if strings.Contains(n.navaidType, "(") {
-				n.navaidType = strings.TrimSpace(n.navaidType[0:strings.Index(n.navaidType, "(")])
+			n.NavaidType = strings.TrimSpace(td.Text())
+			if strings.Contains(n.NavaidType, "(") {
+				n.NavaidType = strings.TrimSpace(n.NavaidType[0:strings.Index(n.NavaidType, "(")])
 			}
-			n.magVar = getMagVariationFromTextOfjpAirportData(td.Text())
+			n.MagVar = getMagVariationFromTextOfjpAirportData(td.Text())
 		case 1:
-			n.id = strings.TrimSpace(td.Text())
+			n.Id = strings.TrimSpace(td.Text())
 		case 2:
-			n.frequency = strings.TrimSpace(td.Text())
+			n.Frequency = strings.TrimSpace(td.Text())
 		case 3:
-			n.operationsHours = strings.TrimSpace(td.Text())
+			n.OperationsHours = strings.TrimSpace(td.Text())
 		case 4:
-			n.position.Latitude = getLatitudeFromTextOfjpAirportData(td.Text())
-			n.position.Longitude = getLongitudeFromTextOfjpAirportData(td.Text())
+			n.Position.Latitude = getLatitudeFromTextOfjpAirportData(td.Text())
+			n.Position.Longitude = getLongitudeFromTextOfjpAirportData(td.Text())
 		case 5:
-			n.elevation = strings.TrimSpace(td.Text())
+			n.Elevation = strings.TrimSpace(td.Text())
 		case 6:
-			n.remarks = strings.TrimSpace(td.Text())
+			n.Remarks = strings.TrimSpace(td.Text())
 		}
 
-		if (n.id != "") && (n.id != "-") {
-			n.key = n.id + " " + n.navaidType
+		if (n.Id != "") && (n.Id != "-") {
+			n.Key = n.Id + " " + n.NavaidType
 		} else {
-			n.key = apt.Icao + " " + n.navaidType
+			n.Key = apt.Icao + " " + n.NavaidType
 		}
 
 	})
@@ -175,15 +216,15 @@ func (apt *JpAirport) loadNavaidsFromTr(tr *goquery.Selection) (Navaid, bool) {
 	//To do this, we test the column where only text should be used.
 	//If a number is defined, it is a title row
 
-	_, errCol1 := strconv.Atoi(n.navaidType)
-	_, errCol2 := strconv.Atoi(n.id)
+	_, errCol1 := strconv.Atoi(n.NavaidType)
+	_, errCol2 := strconv.Atoi(n.Id)
 
-	if (strings.Compare(n.name, "ID") == 0) ||
-		strings.Contains(n.frequency, "requency") ||
+	if (strings.Compare(n.Name, "ID") == 0) ||
+		strings.Contains(n.Frequency, "requency") ||
 		(errCol1 == nil) || (errCol2 == nil) ||
-		(strings.Contains(n.navaidType, "Nil")) ||
-		(strings.Contains(n.id, "Nil")) ||
-		(strings.TrimSpace(n.navaidType) == "") {
+		(strings.Contains(n.NavaidType, "Nil")) ||
+		(strings.Contains(n.Id, "Nil")) ||
+		(strings.TrimSpace(n.NavaidType) == "") {
 		return n, false
 	} else {
 		return n, true
@@ -193,7 +234,7 @@ func (apt *JpAirport) loadNavaidsFromTr(tr *goquery.Selection) (Navaid, bool) {
 func getLatitudeFromTextOfjpAirportData(t string) float32 {
 	latre := regexp.MustCompile(`[0-9]*\.?[0-9]+[N|S]`)
 	latitude := string(latre.Find([]byte(t)))
-	lat, err := convertDDMMSSSSLatitudeToFloat(latitude)
+	lat, err := generic.ConvertDDMMSSSSLatitudeToFloat(latitude)
 	if err != nil {
 		log.Printf("%s Latitude Conversion problem %f \n", t, lat)
 		log.Println(err)
@@ -206,7 +247,7 @@ func getLatitudeFromTextOfjpAirportData(t string) float32 {
 func getLongitudeFromTextOfjpAirportData(t string) float32 {
 	longre := regexp.MustCompile(`[0-9]*\.?[0-9]+[E|W]`)
 	longitude := string(longre.Find([]byte(t)))
-	long, err := convertDDDMMSSSSLongitudeToFloat(longitude)
+	long, err := generic.ConvertDDDMMSSSSLongitudeToFloat(longitude)
 	if err != nil {
 		log.Printf("%s Longitude Conversion problem %f \n", t, long)
 		log.Println(err)

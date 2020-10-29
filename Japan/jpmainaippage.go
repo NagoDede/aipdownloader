@@ -1,4 +1,4 @@
-package main
+package japan
 
 import (
 	"errors"
@@ -14,7 +14,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-type AipDocs []*AipDocument
+type AipDocs []*JpAipDocument
 
 func getAipDocuments(cl *http.Client) AipDocs {
 	resp, err := cl.Get(JapanAis.MainAipPage)
@@ -24,8 +24,8 @@ func getAipDocuments(cl *http.Client) AipDocs {
 
 	defer resp.Body.Close()
 
-	activeDoc := getActiveAipDocument(resp.Body)
-	return activeDoc
+	availableDocs := getActiveAipDocument(resp.Body)
+	return availableDocs
 }
 
 /**
@@ -54,7 +54,7 @@ func getActiveAipDocument(mainaip io.ReadCloser) AipDocs {
 					var publicationDate time.Time
 					var partialURL string
 					var err error
-					aipdoc := new(AipDocument)
+					aipdoc := JpAipDocument{}
 
 					//run across the cells
 					rowhtml.Find("td").Each(func(indexth int, tablecell *goquery.Selection) {
@@ -142,7 +142,7 @@ func getActiveAipDocument(mainaip io.ReadCloser) AipDocs {
 					}
 
 					//add the aipDoc to the list
-					aipDocs = append(aipDocs, aipdoc)
+					aipDocs = append(aipDocs, &aipdoc)
 				}
 
 			})
@@ -178,13 +178,13 @@ func (docs *AipDocs) setActiveAipDoc(targetDate time.Time) {
 	}
 }
 
-func (docs *AipDocs) getActiveAipDoc() *AipDocument {
-	var activeDocs []*AipDocument
+func (docs *AipDocs) getActiveAipDoc() *JpAipDocument {
+	var activeDocs []*JpAipDocument
 
 	//count the number of active document
 	//only one document is active
 	var counter int
-	var activeDoc *AipDocument
+	var activeDoc *JpAipDocument //*generic.AipDocument
 	for _, aipdoc := range *docs {
 		if aipdoc.IsActive {
 			counter++
@@ -322,7 +322,7 @@ func getPublicationDateFromPartialURL(pth string) (time.Time, error) {
 	return date, nil
 }
 
-func (docs AipDocs) GetNextDate(actDoc AipDocument) time.Time {
+func (docs AipDocs) GetNextDate(actDoc JpAipDocument) time.Time {
 
 	sort.SliceStable(docs, func(i, j int) bool {
 		return docs[i].EffectiveDate.Before(docs[j].EffectiveDate)
