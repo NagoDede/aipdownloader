@@ -9,6 +9,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"golang.org/x/net/publicsuffix"
@@ -35,6 +36,18 @@ type MainDataConfig struct {
 	MainAipActiveURL string
 }
 
+/*
+Load the JSON file used for the access to the Japan AIP.
+The required password can be provided by an environment variable or
+directly set in the Json file.
+When the environement variable is used, the password definition shall respect
+the syntax "Env: ENV_VARIABLE_NAME". The function will then retrieve the content
+of the environment variable ENV_VARIABLE_NAME.
+If the environment variable does not exist or is empty, it generates a panic.
+To define an empty password, just set Password = ""  in the Json file.
+The same beahavior is extended to the User ID.
+
+*/
 func (jpd *JpData) LoadJsonFile(path string) {
 	// Open our jsonFile
 	jsonFile, err := os.Open(path)
@@ -51,6 +64,28 @@ func (jpd *JpData) LoadJsonFile(path string) {
 	err = json.Unmarshal(byteValue, jpd)
 	if err != nil {
 		fmt.Println("error:", err)
+	}
+
+	//The password may be provided by an environment variable
+	if strings.HasPrefix(jpd.LoginData.Password, "Env:") {
+		var s = strings.TrimPrefix(jpd.LoginData.Password, "Env:")
+		s = strings.TrimSpace(s)
+		jpd.LoginData.Password = os.Getenv(s)
+
+		if jpd.LoginData.Password == "" {
+			panic(fmt.Sprintf("Password Environment variable: %s  not defined\n", s))
+		}
+	}
+
+	//The UserID may be provided by an environment variable
+	if strings.HasPrefix(jpd.LoginData.UserID, "Env:") {
+		var s = strings.TrimPrefix(jpd.LoginData.UserID, "Env:")
+		s = strings.TrimSpace(s)
+		jpd.LoginData.UserID = os.Getenv(s)
+
+		if jpd.LoginData.UserID == "" {
+			panic(fmt.Sprintf("User ID Environment variable: %s  not defined\n", s))
+		}
 	}
 }
 
@@ -71,8 +106,6 @@ func (jpd *JpData) Process() {
 		" Publication Date: " + activeAipDoc.PublicationDate.Format("02-Jan-2006"))
 	fmt.Println("   " + activeAipDoc.FullURLDir)
 
-
-
 	fmt.Println("Retrieve the Navaids List")
 	activeAipDoc.GetNavaids(&client)
 
@@ -83,12 +116,12 @@ func (jpd *JpData) Process() {
 
 	fmt.Println("Download the Airports Data")
 	activeAipDoc.DownloadAllAiportsData(&client)
-	
+
 	//write the report JSON file
 	jsonData, err := json.MarshalIndent(activeAipDoc, "", " ")
 	if err != nil {
-        log.Println(err)
-    }
+		log.Println(err)
+	}
 	_ = ioutil.WriteFile("info.json", jsonData, 0644)
 }
 
